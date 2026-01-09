@@ -131,9 +131,8 @@ export function runStealthChecks(workbook) {
     checkParallelPair(vtTrailingAngle, STRINGS.stealth.vtTrailingParallel);
   }
 
-  const deduction = Math.min(5, failures);
-  if (deduction > 0) {
-    feedback.push(format(STRINGS.stealth.deduction, deduction));
+  if (failures > 0) {
+    feedback.push(format(STRINGS.stealth.summary, failures));
   }
 
   // Stealth feedback is advisory; geometry deductions are handled in attachments.

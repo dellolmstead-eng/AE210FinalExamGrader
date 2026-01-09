@@ -1,4 +1,5 @@
-import { getCell, asNumber } from "./parseUtils.js";
+import { getCell, getCellByIndex, asNumber } from "./parseUtils.js";
+import { pchip } from "./pchip.js";
 import { runStealthChecks } from "./rules/stealth.js";
 
 // Utility: convert zero-based row/col to Excel ref
@@ -72,15 +73,14 @@ function checkGeometryBlocks(main) {
 
 function checkMissionProfile(main, radius, betaExpected) {
   const feedback = [];
-  const colIdx = [...Array(14).keys()].map((i) => i + 1); // legs 1-14
-  const MissionArray = main.slice(32, 44).map((row) => row ?? []); // rows 33-44
-  const val = (rIdx, cIdx) => asNumber(MissionArray[rIdx]?.[cIdx]);
+  const legCols = [...Array(14).keys()].map((i) => 11 + i); // K..X, legs 1-14
+  const getMission = (row, col) => asNumber(getCellByIndex(main, row, col));
 
-  const alt = colIdx.map((i) => val(0, i));
-  const mach = colIdx.map((i) => val(2, i));
-  const ab = colIdx.map((i) => val(3, i));
-  const dist = colIdx.map((i) => val(5, i));
-  const time = colIdx.map((i) => val(6, i));
+  const alt = legCols.map((col) => getMission(33, col));
+  const mach = legCols.map((col) => getMission(35, col));
+  const ab = legCols.map((col) => getMission(36, col));
+  const dist = legCols.map((col) => getMission(38, col));
+  const time = legCols.map((col) => getMission(39, col));
 
   const altExpected = [0, 2000, 35000, 35000, 35000, 35000, 35000, 30000, 35000, 35000, 35000, 35000, 10000, 0];
   const machExpected = [0.268473504, 0.88, 0.88, 0.88, 0.88, 1.5, 0.8, 0.8, 1.5, 0.8, 0.88, 0.88, 0.4, 0.0];
@@ -92,7 +92,8 @@ function checkMissionProfile(main, radius, betaExpected) {
   const timeExpected = { 8: 2, 13: 20 };
 
   let missionErrors = 0;
-  colIdx.forEach((leg) => {
+  legCols.forEach((col, idx) => {
+    const leg = idx + 1;
     const i = leg - 1;
     if (Math.abs(alt[i] - altExpected[i]) > TOL.alt) {
       feedback.push(`Leg ${leg} Altitude must be ${altExpected[i].toFixed(0)} (found ${roundToTenth(alt[i])})`);
@@ -171,8 +172,8 @@ function checkThrust(miss) {
   const feedback = [];
   const thrustShort = [];
   for (let c = 2; c <= 13; c += 1) {
-    const available = asNumber(miss?.[47]?.[c]);
-    const drag = asNumber(miss?.[48]?.[c]);
+    const drag = asNumber(miss?.[47]?.[c]);
+    const available = asNumber(miss?.[48]?.[c]);
     if (!Number.isFinite(available) || !Number.isFinite(drag)) continue;
     if (drag >= available - TOL.eq) thrustShort.push(c);
   }
@@ -417,28 +418,9 @@ function checkConstraints(main, consts, betaExpected) {
     ];
     const WS_design = asNumber(main?.[12]?.[15]);
     const TW_design = asNumber(main?.[12]?.[16]);
-    const interp = (xList, yList, x) => {
-      const pairs = xList
-        .map((v, idx) => ({ x: asNumber(v), y: asNumber(yList[idx]) }))
-        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
-        .sort((a, b) => a.x - b.x);
-      if (pairs.length === 0) return null;
-      if (x <= pairs[0].x) return pairs[0].y;
-      if (x >= pairs[pairs.length - 1].x) return pairs[pairs.length - 1].y;
-      for (let i = 0; i < pairs.length - 1; i += 1) {
-        const p0 = pairs[i];
-        const p1 = pairs[i + 1];
-        if (x >= p0.x && x <= p1.x) {
-          const slope = (p1.y - p0.y) / (p1.x - p0.x);
-          return p0.y + slope * (x - p0.x);
-        }
-      }
-      return null;
-    };
-
     rows.forEach(({ row, label }) => {
       const TW_curve = (consts?.[row - 1] ?? []).slice(10, 31).map(asNumber);
-      const est = interp(WS_axis, TW_curve, WS_design);
+      const est = pchip(WS_axis, TW_curve, WS_design);
       if (est !== null && Number.isFinite(TW_design) && TW_design < est - TOL.eq) {
         curveFailures += 1;
         failedCurves.push(label);
@@ -462,7 +444,16 @@ function checkConstraints(main, consts, betaExpected) {
     fb.push(`Design did not meet the following constraint curves: ${failedCurves.join(", ")}.`);
   }
 
-  return { pass: tableErrors === 0 && curveFailures === 0, feedback: fb };
+  if (tableErrors > 0) {
+    fb.push(`Constraint table has ${tableErrors} entry issue(s).`);
+  }
+
+  const pass = tableErrors === 0 && curveFailures === 0;
+  if (!pass) {
+    fb.push("Constraint compliance not met; adjust design to satisfy all threshold constraints.");
+  }
+
+  return { pass, feedback: fb };
 }
 
 function checkPayload(main) {
@@ -605,18 +596,29 @@ export function gradeWorkbook(workbook) {
 
   // Preflight error cells
   const invalidCells = checkInvalidMainCells(workbook.sheets?.main ?? []);
-  if (invalidCells.length > 0) {
-    const msg = `Invalid for analysis: Excel errors in Main sheet at ${invalidCells.join(", ")}. Correct the errors and resubmit.`;
-    return { score: 0, maxScore: 100, scoreLine: msg, bonusLine: "", feedbackLog: msg };
-  }
+  const preflightInfo =
+    invalidCells.length > 0 ? `Info: Excel errors in Main sheet at ${invalidCells.join(", ")}.` : "";
 
   const main = workbook.sheets.main;
+  const aero = workbook.sheets.aero;
   const miss = workbook.sheets.miss;
   const consts = workbook.sheets.consts;
   const gear = workbook.sheets.gear;
   const geom = workbook.sheets.geom;
 
   if (workbook.fileName) feedback.push(workbook.fileName);
+  if (preflightInfo) feedback.push(preflightInfo);
+
+  // Aero tab programming (informational)
+  if (aero) {
+    let aeroIssues = 0;
+    if (aero[2]?.[6] === aero[3]?.[6]) aeroIssues += 1; // G3 vs G4
+    if (aero[9]?.[6] === aero[10]?.[6]) aeroIssues += 1; // G10 vs G11
+    if (aero[14]?.[0] === aero[15]?.[0]) aeroIssues += 1; // A15 vs A16
+    if (aeroIssues > 0) {
+      feedback.push(`Aero tab formulas inactive in ${aeroIssues} key cell(s); check A15, G3, and G10.`);
+    }
+  }
 
   // Geometry blocks must be numeric
   const missingGeom = checkGeometryBlocks(main);
@@ -711,12 +713,26 @@ export function gradeWorkbook(workbook) {
   if (!stealthPass) missing.push("stealth shaping");
   if (!mission.missionPass) missing.push("mission table (no deduction)");
 
+  const constraintReasons = [];
+  if (!constraints.pass) constraintReasons.push("constraint table/curves");
+  if (!payload.payloadPass) constraintReasons.push("payload");
+  if (!efficiency.pass) constraintReasons.push("efficiency guards");
+  if (!thrust.pass) constraintReasons.push("Tavail>Drag");
+  if (missingGeom.length > 0) constraintReasons.push("sheet validation");
+
+  const geometryReasons = [];
+  if (!control.pass) geometryReasons.push("controls");
+  if (!stability.pass) geometryReasons.push("stability");
+
+  const gearReasons = [];
+  if (!gearResult.pass) gearReasons.push(`${gearResult.failures} issue(s)`);
+
   const bucketSummary = [
     "Bucket summary:",
-    `  Constraints: ${ternary(constraintsBucketPass, "PASS", "FAIL (-5)")}`,
+    `  Constraints: ${ternary(constraintsBucketPass, "PASS", "FAIL (-5)")}${constraintReasons.length > 0 ? ` [${constraintReasons.join("; ")}]` : ""}`,
     `  Range: ${ternary(mission.rangePass, "PASS", "FAIL (-5)")}`,
-    `  Geometry: ${ternary(geometryBucketPass, "PASS", "FAIL (-5)")}`,
-    `  Gear: ${ternary(gearResult.pass, "PASS", "FAIL (-5)")}`,
+    `  Geometry: ${ternary(geometryBucketPass, "PASS", "FAIL (-5)")}${geometryReasons.length > 0 ? ` [${geometryReasons.join("; ")}]` : ""}`,
+    `  Gear: ${ternary(gearResult.pass, "PASS", "FAIL (-5)")}${gearReasons.length > 0 ? ` [${gearReasons.join("; ")}]` : ""}`,
     `  Fuel: ${ternary(fuelVolume.fuelPass, "PASS", "FAIL (-5)")}`,
     `  Volume: ${ternary(fuelVolume.volumePass, "PASS", "FAIL (-5)")}`,
     `  Stealth: ${ternary(stealthPass, "PASS", "FAIL (-5)")}`,
@@ -732,10 +748,10 @@ export function gradeWorkbook(workbook) {
   if (missing.length > 0) {
     feedback.push(`Checks not met: ${missing.join(", ")}`);
   }
-  feedback.push(bucketSummary);
-  feedback.push(...scoreSummary);
 
-  const feedbackLog = feedback.join("\n");
+  const firstLine = feedback[0] ?? "";
+  const remainingLines = feedback.slice(1);
+  const feedbackLog = [firstLine, bucketSummary, ...remainingLines, ...scoreSummary].filter(Boolean).join("\n");
 
   return {
     score: pt,

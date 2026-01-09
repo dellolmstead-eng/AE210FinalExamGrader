@@ -104,7 +104,7 @@ export const STRINGS = {
     strakeTrailingParallel: "Strake trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).",
     vtLeadingParallel: "Vertical tail leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).",
     vtTrailingParallel: "Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).",
-    deduction: "-%d pts Stealth shaping issues",
+    summary: "Stealth shaping issues flagged in %d area(s).",
   },
   bonus: {
     radius: "Mission radius bonus [+%.1f bonus]: %.1f nm",
