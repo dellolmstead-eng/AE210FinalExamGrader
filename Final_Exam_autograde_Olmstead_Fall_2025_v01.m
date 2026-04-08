@@ -1081,9 +1081,9 @@ end
 gearFailures = 0;
 
 g90 = Gear(20, 10);
-if isnan(g90) || g90 < 80 - tol || g90 > 95 + tol
+if isnan(g90) || g90 < 80 - tol || g90 > 90.5 + tol
     gearFailures = gearFailures + 1;
-    logText = logf(logText, 'Violates nose gear 90/10 rule: %.1f%% (must be between 80%% and 95%%)\n', g90);
+    logText = logf(logText, 'Violates main gear 90/10 rule share at J20: %.1f%% (must be between 80.0%% and 90.5%%)\n', g90);
 end
 
 tipbackActual = Gear(20, 12);

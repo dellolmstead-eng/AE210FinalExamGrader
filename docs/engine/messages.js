@@ -84,7 +84,7 @@ export const STRINGS = {
     obj800: "Recurring cost meets objective (<= $63M) [+1 bonus]: $%.1fM",
   },
   gear: {
-    nose: "Violates nose gear 90/10 rule: %.1f%% (must be between 80% and 95%)",
+    nose: "Violates main gear 90/10 rule share at J20: %.1f%% (must be between 80.0% and 90.5%)",
     tipback: "Violates tipback angle requirement: upper %.2f° must be less than lower %.2f°",
     rollover: "Violates rollover angle requirement: upper %.2f° must be less than lower %.2f°",
     rotation: "Violates takeoff rotation speed: %.1f kts (must be < 200 kts)",

@@ -543,9 +543,9 @@ function checkGear(gear) {
   const fb = [];
   let failures = 0;
   const g90 = asNumber(gear?.[19]?.[9]); // J20
-  if (!Number.isFinite(g90) || g90 < 80 - TOL.eq || g90 > 95 + TOL.eq) {
+  if (!Number.isFinite(g90) || g90 < 80 - TOL.eq || g90 > 90.5 + TOL.eq) {
     failures += 1;
-    fb.push(`Violates nose gear 90/10 rule: ${roundToTenth(g90)}% (must be between 80% and 95%)`);
+    fb.push(`Violates main gear 90/10 rule share at J20: ${roundToTenth(g90)}% (must be between 80.0% and 90.5%)`);
   }
 
   const tipbackActual = asNumber(gear?.[19]?.[11]);
