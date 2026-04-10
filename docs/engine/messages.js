@@ -7,7 +7,7 @@ export const STRINGS = {
     "Leg 3: Must be >= 35,000 ft, Mach = 0.9, AB = 0%",
     "Leg 4: Must be >= 35,000 ft, Mach = 0.9, AB = 0%",
     "Leg 5: Must be >= 35,000 ft, Mach = constraint Supercruise (Main!U4), AB = 0%, Distance >= 150 nm",
-    "Leg 6: Must be >= 30,000 ft, Mach >= 1.2, AB = 100%, Time >= 2 min",
+    "Leg 6: Must be >= 30,000 ft, Mach >= 1.2, AB = 100%",
     "Leg 7: Must be >= 35,000 ft, Mach = constraint Supercruise (Main!U4), AB = 0%, Distance >= 150 nm",
     "Leg 8: Must be >= 35,000 ft, Mach = 0.9, AB = 0%",
     "Leg 9: Must be 10,000 ft, Mach = 0.4, AB = 0%, Time = 20 min",
@@ -69,7 +69,7 @@ export const STRINGS = {
     smWarn: "Warning: aircraft is statically unstable (SM < 0).",
     clb: "Clb must be < -0.001 (O10 = %.6f).",
     cnb: "Cnb must be > 0.002 (P10 = %.6f).",
-    ratio: "Cnb/Clb ratio must be between -1 and -0.3 (Q10 = %.3f).",
+    ratio: "Cnb/Clb ratio magnitude must be between 0.3 and 1.0 (Q10 = %.3f).",
     deduction: "-%d pts Stability parameters outside limits",
   },
   fuel: {

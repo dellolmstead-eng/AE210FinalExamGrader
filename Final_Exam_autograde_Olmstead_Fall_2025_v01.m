@@ -361,7 +361,12 @@ timeExpected(loiterCol) = 20;
 
 missionErrors = 0;
 for i = 1:numel(colIdx)
-    if abs(alt(i) - altExpected(i)) > altTol
+    if i == combatCol
+        if alt(i) < altExpected(i) - altTol
+            logText = logf(logText, 'Leg %d Altitude must be at least %.0f (found %.0f)\n', i, altExpected(i), alt(i));
+            missionErrors = missionErrors + 1;
+        end
+    elseif abs(alt(i) - altExpected(i)) > altTol
         logText = logf(logText, 'Leg %d Altitude must be %.0f (found %.0f)\n', i, altExpected(i), alt(i));
         missionErrors = missionErrors + 1;
     end
@@ -379,12 +384,17 @@ for i = 1:numel(colIdx)
             missionErrors = missionErrors + 1;
         end
     end
-    if i == combatCol || i == loiterCol
+    if i == loiterCol
         if abs(timeLeg(i) - timeExpected(i)) > timeTol
             logText = logf(logText, 'Leg %d Time must be %.2f min (found %.2f)\n', i, timeExpected(i), timeLeg(i));
             missionErrors = missionErrors + 1;
         end
     end
+end
+
+if Main(39, 28) < 720
+    logText = logf(logText, 'Two full 360 turns are required. Increase total turn angle (cell AB39) to 720 degrees or greater to meet the combat turn requirement\n');
+    missionErrors = missionErrors + 1;
 end
 
 if ~isnan(radius)
@@ -1038,8 +1048,8 @@ if cnb <= 0.002
     logText = logf(logText, 'Cnb must be > 0.002 (P10 = %.6f)\n', cnb);
     stabilityErrors = stabilityErrors + 1;
 end
-if ~(rat >= -1 && rat <= -0.3)
-    logText = logf(logText, 'Cnb/Clb ratio must be between -1 and -0.3 (Q10 = %.3f)\n', rat);
+if ~(rat >= 0.3 && rat <= 1)
+    logText = logf(logText, 'Cnb/Clb ratio magnitude must be between 0.3 and 1.0 (Q10 = %.3f)\n', rat);
     stabilityErrors = stabilityErrors + 1;
 end
 
@@ -1277,7 +1287,7 @@ sheets.Miss   = safeReadMatrix(filename, 'Miss',   {'C48','C49'});
 sheets.Main   = safeReadMatrix(filename, 'Main',   {'S3','T3','U3','V3','W3','X3','Y3','S4','T4','U4','V4','W4','X4','Y4',...
     'S5','S6','S7','S8','S9','T6','U6','V6','W6','X6','Y6','T7','U7','V7',...
     'W7','X7','Y7','T8','U8','V8','W8','X8','Y8','T9','U9','V9','W9','X9',...
-    'Y9','S12','S13','AB3','AB4','X12','X13','Y37','M10','O10','P10','Q10',...
+    'Y9','S12','S13','AB3','AB4','AB39','X12','X13','Y37','M10','O10','P10','Q10',...
     'O18','X40','Q23','Q31','N31','P13','Q13','B32','B19','C19','D19','H19','B21','C21',...
     'D21','H21','B23','C23','D23','H23','D24','H24','C26','D26',...
     'B27','C27','H27','F31','F32','H29','I29','O15','B34','B35','B36','B37',...

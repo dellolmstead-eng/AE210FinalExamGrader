@@ -81,6 +81,7 @@ function checkMissionProfile(main, radius, betaExpected) {
   const ab = legCols.map((col) => getMission(36, col));
   const dist = legCols.map((col) => getMission(38, col));
   const time = legCols.map((col) => getMission(39, col));
+  const combatTurnAngle = getNumber(main, "AB39");
 
   const altExpected = [0, 2000, 35000, 35000, 35000, 35000, 35000, 30000, 35000, 35000, 35000, 35000, 10000, 0];
   const machExpected = [0.268473504, 0.88, 0.88, 0.88, 0.88, 1.5, 0.8, 0.8, 1.5, 0.8, 0.88, 0.88, 0.4, 0.0];
@@ -95,7 +96,12 @@ function checkMissionProfile(main, radius, betaExpected) {
   legCols.forEach((col, idx) => {
     const leg = idx + 1;
     const i = leg - 1;
-    if (Math.abs(alt[i] - altExpected[i]) > TOL.alt) {
+    if (leg === combatCol) {
+      if (alt[i] < altExpected[i] - TOL.alt) {
+        feedback.push(`Leg ${leg} Altitude must be at least ${altExpected[i].toFixed(0)} (found ${roundToTenth(alt[i])})`);
+        missionErrors += 1;
+      }
+    } else if (Math.abs(alt[i] - altExpected[i]) > TOL.alt) {
       feedback.push(`Leg ${leg} Altitude must be ${altExpected[i].toFixed(0)} (found ${roundToTenth(alt[i])})`);
       missionErrors += 1;
     }
@@ -112,7 +118,7 @@ function checkMissionProfile(main, radius, betaExpected) {
         missionErrors += 1;
       }
     }
-    if (leg === combatCol || leg === loiterCol) {
+    if (leg === loiterCol) {
       const expected = timeExpected[leg];
       if (Math.abs(time[i] - expected) > TOL.time) {
         feedback.push(`Leg ${leg} Time must be ${expected.toFixed(2)} min (found ${roundToTenth(time[i])})`);
@@ -120,6 +126,11 @@ function checkMissionProfile(main, radius, betaExpected) {
       }
     }
   });
+
+  if (!(combatTurnAngle >= 720)) {
+    feedback.push("Two full 360 turns are required. Increase total turn angle (cell AB39) to 720 degrees or greater to meet the combat turn requirement");
+    missionErrors += 1;
+  }
 
   let rangePass = false;
   let rangeObjectivePass = false;
@@ -492,8 +503,8 @@ function checkStability(main) {
     fb.push(`Cnb must be > 0.002 (P10 = ${cnb?.toFixed?.(6) ?? "NaN"})`);
     failures += 1;
   }
-  if (!(rat >= -1 && rat <= -0.3)) {
-    fb.push(`Cnb/Clb ratio must be between -1 and -0.3 (Q10 = ${roundToTenth(rat)})`);
+  if (!(rat >= 0.3 && rat <= 1)) {
+    fb.push(`Cnb/Clb ratio magnitude must be between 0.3 and 1.0 (Q10 = ${roundToTenth(rat)})`);
     failures += 1;
   }
   if (failures > 0) fb.push(`Stability criteria failed in ${failures} area(s).`);
