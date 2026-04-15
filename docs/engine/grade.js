@@ -81,7 +81,6 @@ function checkMissionProfile(main, radius, betaExpected) {
   const ab = legCols.map((col) => getMission(36, col));
   const dist = legCols.map((col) => getMission(38, col));
   const time = legCols.map((col) => getMission(39, col));
-  const combatTurnAngle = getNumber(main, "AB39");
 
   const altExpected = [0, 2000, 35000, 35000, 35000, 35000, 35000, 30000, 35000, 35000, 35000, 35000, 10000, 0];
   const machExpected = [0.268473504, 0.88, 0.88, 0.88, 0.88, 1.5, 0.8, 0.8, 1.5, 0.8, 0.88, 0.88, 0.4, 0.0];
@@ -90,18 +89,14 @@ function checkMissionProfile(main, radius, betaExpected) {
   const distExpected = { 6: 400, 9: 400 };
   const combatCol = 8;
   const loiterCol = 13;
-  const timeExpected = { 8: 2, 13: 20 };
+  const timeExpected = { 13: 20 };
+  const combatTurnAngle = getNumber(main, "AB39");
 
   let missionErrors = 0;
   legCols.forEach((col, idx) => {
     const leg = idx + 1;
     const i = leg - 1;
-    if (leg === combatCol) {
-      if (alt[i] < altExpected[i] - TOL.alt) {
-        feedback.push(`Leg ${leg} Altitude must be at least ${altExpected[i].toFixed(0)} (found ${roundToTenth(alt[i])})`);
-        missionErrors += 1;
-      }
-    } else if (Math.abs(alt[i] - altExpected[i]) > TOL.alt) {
+    if (Math.abs(alt[i] - altExpected[i]) > TOL.alt) {
       feedback.push(`Leg ${leg} Altitude must be ${altExpected[i].toFixed(0)} (found ${roundToTenth(alt[i])})`);
       missionErrors += 1;
     }

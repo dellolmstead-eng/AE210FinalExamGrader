@@ -1,5 +1,5 @@
 export const RULES = {
-  versionLabel: "Final Exam Grader 2025 v2.0",
+  versionLabel: "Final Exam Grader 2025 v3.0",
   matlabVersion: "Final_Exam_autograde_Olmstead_Fall_2025_v01",
   sheets: {
     Aero: {
@@ -21,7 +21,7 @@ export const RULES = {
         "T8", "U8", "V8", "W8", "X8", "Y8",
         "T9", "U9", "V9", "W9", "X9", "Y9",
         "S12", "S13",
-        "AB3", "AB4", "X12", "X13", "Y37",
+        "AB3", "AB4", "AB39", "X12", "X13", "Y37",
         "M10", "O10", "P10", "Q10",
         "O18", "X40", "Q23", "Q31", "N31",
         "P13", "Q13",
@@ -40,7 +40,7 @@ export const RULES = {
         "K35", "L35", "M35", "N35", "P35", "R35", "S35", "V35", "W35",
         "K36", "L36", "M36", "N36", "P36", "R36", "S36", "V36", "W36",
         "K38", "L38", "M38", "N38", "P38", "R38", "S38", "V38", "W38",
-        "K39", "L39", "M39", "N39", "P39", "R39", "S39", "V39", "W39", "AB39",
+        "K39", "L39", "M39", "N39", "P39", "R39", "S39", "V39", "W39",
         "B32", "C18", "C19", "C20", "C21", "C22", "C23", "C24", "C25", "C26", "C27",
         "D18", "D19", "D20", "D21", "D22", "D23", "D24", "D25", "D26", "D27",
         "H18", "H19", "H20", "H21", "H22", "H23", "H24", "H25", "H26", "H27",
@@ -55,7 +55,7 @@ export const RULES = {
       fallbackCells: ["J20", "L20", "L21", "M20", "M21", "N20"],
     },
     Geom: {
-      fallbackCells: ["C8", "C10", "M152", "K15", "L155", "L38"],
+      fallbackCells: ["C8", "C10", "M152", "K15", "L155", "L38", "L40", "L41", "N44", "L117", "L118", "N121"],
     },
   },
   macroWarningText:

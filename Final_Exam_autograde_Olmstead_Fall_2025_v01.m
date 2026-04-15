@@ -356,17 +356,11 @@ distExpected(supercruiseCols) = [400, 400];
 combatCol = 8;
 loiterCol = 13;
 timeExpected = nan(1, numel(colIdx));
-timeExpected(combatCol) = 2;
 timeExpected(loiterCol) = 20;
 
 missionErrors = 0;
 for i = 1:numel(colIdx)
-    if i == combatCol
-        if alt(i) < altExpected(i) - altTol
-            logText = logf(logText, 'Leg %d Altitude must be at least %.0f (found %.0f)\n', i, altExpected(i), alt(i));
-            missionErrors = missionErrors + 1;
-        end
-    elseif abs(alt(i) - altExpected(i)) > altTol
+    if abs(alt(i) - altExpected(i)) > altTol
         logText = logf(logText, 'Leg %d Altitude must be %.0f (found %.0f)\n', i, altExpected(i), alt(i));
         missionErrors = missionErrors + 1;
     end
@@ -618,9 +612,9 @@ STEALTH_TOL = 5;
 stealthFailures = 0;
 
 wingLeadingAngle = computeEdgeAngleDeg(Geom, 38, 39);
-wingTrailingAngle = computeEdgeAngleDeg(Geom, 40, 41);
+wingTrailingAngle = computeWingTrailingPlanformAngleDeg(Geom);
 pcsLeadingAngle = computeEdgeAngleDeg(Geom, 115, 116);
-pcsTrailingAngle = computeEdgeAngleDeg(Geom, 117, 118);
+pcsTrailingAngle = computePcsTrailingPlanformAngleDeg(Geom);
 strakeLeadingAngle = computeEdgeAngleDeg(Geom, 152, 153);
 strakeTrailingAngle = computeEdgeAngleDeg(Geom, 154, 155);
 vtLeadingAngle = computeEdgeAngleDeg(Geom, 163, 164);
@@ -643,6 +637,11 @@ end
 
 wingTipTE = geomPlanformPoint(Geom, 40);
 wingCenterTE = geomPlanformPoint(Geom, 41);
+pcsTipTE = geomPlanformPoint(Geom, 117);
+pcsInnerTE = geomPlanformPoint(Geom, 118);
+vtTipTE = geomPlanformPoint(Geom, 165);
+vtInnerTE = geomPlanformPoint(Geom, 166);
+VT_z = Main(25, 8);
 if ~(wingActive && (anglesParallel(wingTrailingAngle, wingLeadingAngle, STEALTH_TOL) || teNormalHitsCenterline(wingTipTE, wingCenterTE)))
     logText = logf(logText, 'Wing trailing edge %.1f° is not parallel to the leading edge and its normal does not reach the fuselage centerline (+/- %.1f°).\n', wingTrailingAngle, STEALTH_TOL);
     stealthFailures = stealthFailures + 1;
@@ -650,7 +649,7 @@ end
 
 if pcsActive && ~isnan(pcsDihedral) && pcsDihedral > 5
     [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, pcsTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
+    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, pcsTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the surface remains within the fuselage average height (+/- %.1f°).\n', pcsTipTE, pcsInnerTE, isWithinFuselageHeight(PCS_z, fuse_z_center, fuse_z_height));
 end
 
 if strakeActive
@@ -665,7 +664,7 @@ elseif isnan(vtTilt)
     stealthFailures = stealthFailures + 1;
 elseif vtTilt < 85
     [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, vtLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
+    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isWithinFuselageHeight(VT_z, fuse_z_center, fuse_z_height));
 end
 
 if stealthFailures > 0
@@ -1297,7 +1296,7 @@ sheets.Main   = safeReadMatrix(filename, 'Main',   {'S3','T3','U3','V3','W3','X3
     'D18','D23','D52','F52'});
 sheets.Consts = safeReadMatrix(filename, 'Consts', {'K22','K23','K24','K26','K27','K28','K29','K32','AO42','AQ41','K33'});
 sheets.Gear   = safeReadMatrix(filename, 'Gear',   {'J20','L20','L21','M20','M21','N20'});
-sheets.Geom   = safeReadMatrix(filename, 'Geom',   {'C8','C10','M152','K15','L155','L38'});
+sheets.Geom   = safeReadMatrix(filename, 'Geom',   {'C8','C10','M152','K15','L155','L38','L40','L41','N44','L117','L118','N121'});
 
 % Constants is off by three rows. Row 22 of the Consts tab comes in as
 % row 19 in matlab Consts variable. Adding three rows of NaN to the top
@@ -1381,6 +1380,40 @@ if any(isnan([p1, p2]))
     angle = NaN;
     return;
 end
+
+function angle = computeWingTrailingPlanformAngleDeg(Geom)
+xA = Geom(40, 12);
+xB = Geom(41, 12);
+halfSpan = Geom(44, 14);
+if any(isnan([xA, xB, halfSpan]))
+    angle = NaN;
+    return;
+end
+dx = abs(xA - xB);
+dy = abs(halfSpan);
+if dx == 0 && dy == 0
+    angle = 0;
+else
+    angle = atan2d(dx, dy);
+end
+end
+
+function angle = computePcsTrailingPlanformAngleDeg(Geom)
+xA = Geom(117, 12);
+xB = Geom(118, 12);
+halfSpan = Geom(121, 14);
+if any(isnan([xA, xB, halfSpan]))
+    angle = NaN;
+    return;
+end
+dx = abs(xA - xB);
+dy = abs(halfSpan);
+if dx == 0 && dy == 0
+    angle = 0;
+else
+    angle = atan2d(dx, dy);
+end
+end
 dx = abs(p2(1) - p1(1));
 dy = abs(p2(2) - p1(2));
 if dx == 0 && dy == 0
@@ -1444,6 +1477,24 @@ elseif ~anglesParallel(angle, wingAngle, tol)
     logText = logf(logText, template, angle, wingAngle, tol);
     failures = failures + 1;
 end
+end
+
+function [logText, failures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, failures, angle, wingAngle, tol, template, tipPoint, innerPoint, withinFuselageHeight)
+if isnan(angle) || isnan(wingAngle)
+    logText = logf(logText, 'Unable to verify stealth shaping due to missing geometry data\n');
+    failures = failures + 1;
+elseif ~(anglesParallel(angle, wingAngle, tol) || (withinFuselageHeight && teNormalHitsCenterline(tipPoint, innerPoint)))
+    logText = logf(logText, template, angle, wingAngle, tol);
+    failures = failures + 1;
+end
+end
+
+function tf = isWithinFuselageHeight(componentZ, fuselageCenterZ, fuselageHeight)
+if any(isnan([componentZ, fuselageCenterZ, fuselageHeight]))
+    tf = false;
+    return;
+end
+tf = componentZ >= (fuselageCenterZ - fuselageHeight/2) && componentZ <= (fuselageCenterZ + fuselageHeight/2);
 end
 
 function field = mapCurveField(label)
