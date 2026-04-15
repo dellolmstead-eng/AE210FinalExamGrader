@@ -582,9 +582,9 @@ function checkGear(gear) {
         failures += 1;
         fb.push("Takeoff speed margin failed: N21 missing; N20 must be below N21.");
       } else {
-        if (rotationSpeed >= rotationRef - TOL.eq) {
+        if (rotationSpeed >= rotationRef) {
           failures += 1;
-          fb.push(`Takeoff speed margin failed: N20 must be less than N21 (N20 = ${roundToTenth(rotationSpeed)}, N21 = ${roundToTenth(rotationRef)})`);
+          fb.push(`Takeoff speed margin failed: N20 must be less than N21 (N20 = ${rotationSpeed.toFixed(2)}, N21 = ${rotationRef.toFixed(2)})`);
         }
         if (rotationRef > 200 + TOL.eq) {
           failures += 1;
