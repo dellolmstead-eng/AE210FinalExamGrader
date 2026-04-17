@@ -1,5 +1,5 @@
 export const RULES = {
-  versionLabel: "Final Exam Grader 2025 v3.0",
+  versionLabel: "Final Exam Grader 2025 v3.1",
   matlabVersion: "Final_Exam_autograde_Olmstead_Fall_2025_v01",
   sheets: {
     Aero: {

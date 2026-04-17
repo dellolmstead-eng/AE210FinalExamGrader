@@ -9,7 +9,7 @@
 
 %--------------------------------------------------------------------------
 % AE210 Final Exam Autograder Script â€“ Fall 2025
-% Version: v2.0
+% Version: v3.1
 %
 % Description:
 % This script automates grading for the AE210 Final Exam by processing Jet11 Excel files (*.xlsm). It evaluates 
@@ -252,6 +252,7 @@ altTol = 1;
 machTol = 1e-2;
 timeTol = 1e-2;
 distTol = 1e-3;
+fuelTol = 5e-2;
 fuel_available = Main(18, 15);
 fuel_capacity = Main(15, 15);
 fuel_required = Main(40, 24);
@@ -611,6 +612,7 @@ end
 STEALTH_TOL = 5;
 CORNER_REFLECTOR_TARGET = 45;
 CORNER_REFLECTOR_TOL = 5;
+CORNER_REFLECTOR_EDGE_TOL = 0.1;
 stealthFailures = 0;
 
 wingLeadingAngle = computeEdgeAngleDeg(Geom, 38, 39);
@@ -621,8 +623,7 @@ strakeLeadingAngle = computeEdgeAngleDeg(Geom, 152, 153);
 strakeTrailingAngle = computeEdgeAngleDeg(Geom, 154, 155);
 vtLeadingAngle = computeEdgeAngleDeg(Geom, 163, 164);
 vtTrailingAngle = computeEdgeAngleDeg(Geom, 165, 166);
-wingDihedral = Main(27, 2);
-pcsTilt = Main(27, 3);
+wingDihedral = Main(26, 2);
 pcsDihedral = Main(26, 3);
 vtTilt = Main(27, 8);
 wingArea = Main(18, 2);
@@ -639,15 +640,15 @@ if pcsActive && wingActive && ~anglesParallel(pcsLeadingAngle, wingLeadingAngle,
     stealthFailures = stealthFailures + 1;
 end
 
-if wingActive && ~isnan(wingDihedral) && abs(wingDihedral - CORNER_REFLECTOR_TARGET) <= CORNER_REFLECTOR_TOL
-    logText = logf(logText, 'Main!B27 wing dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', wingDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
+if wingActive && ~isnan(wingDihedral) && abs(wingDihedral - CORNER_REFLECTOR_TARGET) < (CORNER_REFLECTOR_TOL - CORNER_REFLECTOR_EDGE_TOL)
+    logText = logf(logText, 'Main!B26 wing dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', wingDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
     stealthFailures = stealthFailures + 1;
 end
-if pcsActive && ~isnan(pcsTilt) && abs(pcsTilt - CORNER_REFLECTOR_TARGET) <= CORNER_REFLECTOR_TOL
-    logText = logf(logText, 'Main!C27 pitch control surface tilt/dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', pcsTilt, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
+if pcsActive && ~isnan(pcsDihedral) && abs(pcsDihedral - CORNER_REFLECTOR_TARGET) < (CORNER_REFLECTOR_TOL - CORNER_REFLECTOR_EDGE_TOL)
+    logText = logf(logText, 'Main!C26 pitch control surface dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', pcsDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
     stealthFailures = stealthFailures + 1;
 end
-if vtActive && ~isnan(vtTilt) && abs(vtTilt - CORNER_REFLECTOR_TARGET) <= CORNER_REFLECTOR_TOL
+if vtActive && ~isnan(vtTilt) && abs(vtTilt - CORNER_REFLECTOR_TARGET) < (CORNER_REFLECTOR_TOL - CORNER_REFLECTOR_EDGE_TOL)
     logText = logf(logText, 'Main!H27 vertical tail tilt angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', vtTilt, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
     stealthFailures = stealthFailures + 1;
 end
@@ -681,7 +682,7 @@ elseif isnan(vtTilt)
     stealthFailures = stealthFailures + 1;
 elseif vtTilt < 85
     [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, vtLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isWithinFuselageHeight(VT_z, fuse_z_center, fuse_z_height));
+    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isSurfaceWithinFuselageHeight(VT_z, vtTilt, vtTipTE, vtInnerTE, fuse_z_center, fuse_z_height));
 end
 
 if stealthFailures > 0
@@ -1075,7 +1076,10 @@ if stabilityErrors > 0
 end
 
 % Fuel (informational) and volume (scored later)
-if isnan(fuel_available) || isnan(fuel_required) || fuel_available + tol < fuel_required
+if isnan(fuel_available) || isnan(fuel_required)
+    logText = logf(logText, 'Fuel check could not be evaluated because O18 or X40 is not numeric.\n');
+    fuelPass = false;
+elseif fuel_available + fuelTol < fuel_required
     logText = logf(logText, 'Fuel available (%.1f) is less than required (%.1f); check reserves.\n', fuel_available, fuel_required);
     fuelPass = false;
 else
@@ -1407,37 +1411,11 @@ end
 end
 
 function angle = computeWingTrailingPlanformAngleDeg(Geom)
-xA = Geom(40, 12);
-xB = Geom(41, 12);
-halfSpan = Geom(44, 14);
-if any(isnan([xA, xB, halfSpan]))
-    angle = NaN;
-    return;
-end
-dx = abs(xA - xB);
-dy = abs(halfSpan);
-if dx == 0 && dy == 0
-    angle = 0;
-else
-    angle = atan2d(dx, dy);
-end
+angle = computeEdgeAngleDeg(Geom, 40, 41);
 end
 
 function angle = computePcsTrailingPlanformAngleDeg(Geom)
-xA = Geom(117, 12);
-xB = Geom(118, 12);
-halfSpan = Geom(121, 14);
-if any(isnan([xA, xB, halfSpan]))
-    angle = NaN;
-    return;
-end
-dx = abs(xA - xB);
-dy = abs(halfSpan);
-if dx == 0 && dy == 0
-    angle = 0;
-else
-    angle = atan2d(dx, dy);
-end
+angle = computeEdgeAngleDeg(Geom, 117, 118);
 end
 
 function point = geomPlanformPoint(Geom, row)
@@ -1515,6 +1493,18 @@ if any(isnan([componentZ, fuselageCenterZ, fuselageHeight]))
     return;
 end
 tf = componentZ >= (fuselageCenterZ - fuselageHeight/2) && componentZ <= (fuselageCenterZ + fuselageHeight/2);
+end
+
+function tf = isSurfaceWithinFuselageHeight(componentZ, dihedralAngle, tipPoint, innerPoint, fuselageCenterZ, fuselageHeight)
+if any(isnan([componentZ, dihedralAngle, tipPoint, innerPoint, fuselageCenterZ, fuselageHeight]))
+    tf = false;
+    return;
+end
+spanOffset = abs(tipPoint(2) - innerPoint(2));
+tipZ = componentZ + spanOffset * tand(dihedralAngle);
+lower = fuselageCenterZ - fuselageHeight/2;
+upper = fuselageCenterZ + fuselageHeight/2;
+tf = componentZ >= lower && componentZ <= upper && tipZ >= lower && tipZ <= upper;
 end
 
 function field = mapCurveField(label)
