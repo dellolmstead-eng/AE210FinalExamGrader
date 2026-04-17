@@ -1,6 +1,6 @@
 {
   "name": "ae210-final-exam-webgrader",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Browser grader for the AE210 Final Exam Jet11 workbook. Mirrors the MATLAB final exam autograder and runs entirely client-side.",
   "main": "index.js",
   "directories": {
