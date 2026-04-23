@@ -1624,6 +1624,17 @@ uiwait(d);  % Wait for user to close dialog
     end
 end
 
+function username = extractBlackboardUsername(fname)
+% Blackboard export filenames place the username in the token immediately
+% before "_attempt". Keep this tolerant of dots, dashes, and underscores.
+userTok = regexp(fname, '_([^\\s]+?)_attempt(?:_|\\.|$)', 'tokens', 'once');
+if ~isempty(userTok)
+    username = userTok{1};
+else
+    username = 'UNKNOWN';
+end
+end
+
 %% Prompt user and generate Blackboard CSV (combined function)
 function promptAndGenerateBlackboardCSV(folderAnalyzed, files, points, feedback, timestamp)
 % Position dialog below cursor
@@ -1661,7 +1672,7 @@ uicontrol('Parent', d, ...
             fid = fopen(csvFilename, 'w');
 
             % Assignment title column (update if needed)
-            assignmentTitle = 'Final Exam Jet11 Problem [Total Pts: 100 Score] |409586';
+            assignmentTitle = 'Final Exam Jet11 Problem [Total Pts: 100 Score] |466354';
 
             % Write header (username only; no first/last name columns)
             % Column order must match Blackboard export: Username | Assignment score | Grading Notes | Notes Format | Feedback to Learner | Feedback Format
@@ -1670,13 +1681,7 @@ uicontrol('Parent', d, ...
             for i = 1:numel(files)
                 fname = files(i).name;
 
-                % Extract username from the canonical segment "_<username>_attempt"
-                userTok = regexp(fname, '_([A-Za-z0-9\\.\\-]+)_attempt', 'tokens', 'once');
-                if ~isempty(userTok)
-                    username = userTok{1};
-                else
-                    username = 'UNKNOWN';
-                end
+                username = extractBlackboardUsername(fname);
 
                 % Get score and feedback
                 score = max(0, min(100, roundToTenth(points(i))));
