@@ -623,7 +623,7 @@ end
 
 controlPass = controlFailures == 0;
 if controlFailures > 0
-    logText = logf(logText, 'Control surface attachment has %d issue(s).\n', controlFailures);
+    logText = logf(logText, 'Geometry/attachment issues detected; see notes above.\n');
 end
 
 % Stealth shaping 
@@ -1227,7 +1227,7 @@ if ~thrustPass,      constraintReasons{end+1} = 'Tavail>Drag'; end %#ok<AGROW>
 if ~dataValidPass,   constraintReasons{end+1} = 'sheet validation'; end %#ok<AGROW>
 
 geometryReasons = {};
-if ~controlPass,   geometryReasons{end+1} = 'controls'; end %#ok<AGROW>
+if ~controlPass,   geometryReasons{end+1} = 'geometry/attachment'; end %#ok<AGROW>
 if ~stabilityPass, geometryReasons{end+1} = 'stability'; end %#ok<AGROW>
 
 gearReasons = {};
@@ -1280,7 +1280,7 @@ if ~thrustPass,      constraintReasons{end+1} = 'Tavail>Drag'; end %#ok<AGROW>
 if ~dataValidPass,   constraintReasons{end+1} = 'sheet validation'; end %#ok<AGROW>
 
 geometryReasons = {};
-if ~controlPass,   geometryReasons{end+1} = 'controls'; end %#ok<AGROW>
+if ~controlPass,   geometryReasons{end+1} = 'geometry/attachment'; end %#ok<AGROW>
 if ~stabilityPass, geometryReasons{end+1} = 'stability'; end %#ok<AGROW>
 
 gearReasons = {};
