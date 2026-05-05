@@ -632,6 +632,7 @@ CORNER_REFLECTOR_TARGET = 45;
 CORNER_REFLECTOR_TOL = 5;
 CORNER_REFLECTOR_EDGE_TOL = 0.1;
 stealthFailures = 0;
+stealthHeaderLogged = false;
 
 wingLeadingAngle = computeEdgeAngleDeg(Geom, 38, 39);
 wingTrailingAngle = computeWingTrailingPlanformAngleDeg(Geom);
@@ -654,21 +655,17 @@ strakeActive = isnan(strakeArea) || strakeArea >= 1;
 vtActive = isnan(vtArea) || vtArea >= 1;
 
 if pcsActive && wingActive && ~anglesParallel(pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL)
-    logText = logf(logText, 'Pitch control surface leading edge sweep %.1f° must match the wing leading edge sweep %.1f° (+/- %.1f°).\n', pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL);
-    stealthFailures = stealthFailures + 1;
+    [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Pitch control surface leading edge sweep %.1f° must match the wing leading edge sweep %.1f° (+/- %.1f°).\n', pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL);
 end
 
 if wingActive && ~isnan(wingDihedral) && abs(wingDihedral - CORNER_REFLECTOR_TARGET) < (CORNER_REFLECTOR_TOL - CORNER_REFLECTOR_EDGE_TOL)
-    logText = logf(logText, 'Main!B26 wing dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', wingDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
-    stealthFailures = stealthFailures + 1;
+    [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Main!B26 wing dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', wingDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
 end
 if pcsActive && ~isnan(pcsDihedral) && abs(pcsDihedral - CORNER_REFLECTOR_TARGET) < (CORNER_REFLECTOR_TOL - CORNER_REFLECTOR_EDGE_TOL)
-    logText = logf(logText, 'Main!C26 pitch control surface dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', pcsDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
-    stealthFailures = stealthFailures + 1;
+    [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Main!C26 pitch control surface dihedral angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', pcsDihedral, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
 end
 if vtActive && ~isnan(vtTilt) && abs(vtTilt - CORNER_REFLECTOR_TARGET) < (CORNER_REFLECTOR_TOL - CORNER_REFLECTOR_EDGE_TOL)
-    logText = logf(logText, 'Main!H27 vertical tail tilt angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', vtTilt, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
-    stealthFailures = stealthFailures + 1;
+    [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Main!H27 vertical tail tilt angle %.1f° creates a corner reflector because it is within %.1f° of 45°. Increase or decrease at least %.1f° off 45° to avoid significant stealth signature increase.\n', vtTilt, CORNER_REFLECTOR_TOL, CORNER_REFLECTOR_TOL);
 end
 
 wingTipTE = geomPlanformPoint(Geom, 40);
@@ -678,35 +675,39 @@ pcsInnerTE = geomPlanformPoint(Geom, 118);
 vtTipTE = geomPlanformPoint(Geom, 165);
 vtInnerTE = geomPlanformPoint(Geom, 166);
 VT_z = Main(25, 8);
-if ~(wingActive && (anglesParallel(wingTrailingAngle, wingLeadingAngle, STEALTH_TOL) || teNormalHitsCenterline(wingTipTE, wingCenterTE, fuselage_length)))
-    logText = logf(logText, 'Wing trailing edge %.1f° is not parallel to the leading edge and its normal does not reach the fuselage centerline (+/- %.1f°).\n', wingTrailingAngle, STEALTH_TOL);
+if wingActive
+    if ~(anglesParallel(wingTrailingAngle, wingLeadingAngle, STEALTH_TOL) || teNormalHitsCenterline(wingTipTE, wingCenterTE, fuselage_length))
+        [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Wing trailing edge %.1f° is not parallel to the leading edge and its normal does not reach the fuselage centerline (+/- %.1f°).\n', wingTrailingAngle, STEALTH_TOL);
+        stealthFailures = stealthFailures + 1;
+    end
+elseif pcsActive || strakeActive || vtActive
+    [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Unable to verify stealth shaping due to missing geometry data\n');
     stealthFailures = stealthFailures + 1;
 end
 
 if pcsActive && ~isnan(pcsDihedral) && pcsDihedral > 5
-    [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, pcsTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the surface remains within the fuselage average height (+/- %.1f°).\n', pcsTipTE, pcsInnerTE, isSurfaceWithinFuselageHeight(PCS_z, pcsDihedral, pcsTipTE, pcsInnerTE, fuse_z_center, fuse_z_height), fuselage_length);
+    [logText, stealthFailures, stealthHeaderLogged] = requireParallelAngle(logText, stealthFailures, stealthHeaderLogged, pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
+    [logText, stealthFailures, stealthHeaderLogged] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, stealthHeaderLogged, pcsTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the surface remains within the fuselage average height (+/- %.1f°).\n', pcsTipTE, pcsInnerTE, isSurfaceWithinFuselageHeight(PCS_z, pcsDihedral, pcsTipTE, pcsInnerTE, fuse_z_center, fuse_z_height), fuselage_length);
 end
 
 if strakeActive
-    [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, strakeLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Strake leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, strakeTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Strake trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
+    [logText, stealthFailures, stealthHeaderLogged] = requireParallelAngle(logText, stealthFailures, stealthHeaderLogged, strakeLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Strake leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
+    [logText, stealthFailures, stealthHeaderLogged] = requireParallelAngle(logText, stealthFailures, stealthHeaderLogged, strakeTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Strake trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
 end
 
 if ~vtActive
     % ignore
 elseif isnan(vtTilt)
-    logText = logf(logText, 'Unable to verify stealth shaping due to missing geometry data\n');
+    [logText, stealthHeaderLogged] = logStealth(logText, stealthHeaderLogged, 'Unable to verify stealth shaping due to missing geometry data\n');
     stealthFailures = stealthFailures + 1;
 elseif vtTilt < 85
-    [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, vtLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isSurfaceWithinFuselageHeight(VT_z, vtTilt, vtTipTE, vtInnerTE, fuse_z_center, fuse_z_height), fuselage_length);
+    [logText, stealthFailures, stealthHeaderLogged] = requireParallelAngle(logText, stealthFailures, stealthHeaderLogged, vtLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
+    [logText, stealthFailures, stealthHeaderLogged] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, stealthHeaderLogged, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isSurfaceWithinFuselageHeight(VT_z, vtTilt, vtTipTE, vtInnerTE, fuse_z_center, fuse_z_height), fuselage_length);
 end
 
-if stealthFailures > 0
-    logText = logf(logText, 'Stealth shaping issues flagged in %d area(s).\n', stealthFailures);
-else
-    stealthPass = true;
+stealthPass = stealthFailures == 0;
+if ~stealthPass
+    logText = logf(logText, '-5 pts Stealth shaping issues detected.\n');
 end
 
 % Constraint table values
@@ -1297,7 +1298,7 @@ fprintf('Buckets: Constraints %s | Range %s | Geometry %s | Gear %s | Fuel %s | 
     bucketLabel(fuelPass, {}), ...
     bucketLabel(volumePass, {}));
 if ~stealthPass
-    fprintf('Advisory: Stealth shaping issues (no deduction).\n');
+    fprintf('Stealth shaping issues detected (-5).\n');
 end
 if ~missionPass
     fprintf('Advisory: Mission table mismatches (no deduction).\n');
@@ -1485,22 +1486,22 @@ alt = 180 - diffVal;
 tf = min(diffVal, alt) <= tol;
 end
 
-function [logText, failures] = requireParallelAngle(logText, failures, angle, wingAngle, tol, template)
+function [logText, failures, headerLogged] = requireParallelAngle(logText, failures, headerLogged, angle, wingAngle, tol, template)
 if isnan(angle) || isnan(wingAngle)
-    logText = logf(logText, 'Unable to verify stealth shaping due to missing geometry data\n');
+    [logText, headerLogged] = logStealth(logText, headerLogged, 'Unable to verify stealth shaping due to missing geometry data\n');
     failures = failures + 1;
 elseif ~anglesParallel(angle, wingAngle, tol)
-    logText = logf(logText, template, angle, wingAngle, tol);
+    [logText, headerLogged] = logStealth(logText, headerLogged, template, angle, wingAngle, tol);
     failures = failures + 1;
 end
 end
 
-function [logText, failures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, failures, angle, wingAngle, tol, template, tipPoint, innerPoint, withinFuselageHeight, fuselageLength)
+function [logText, failures, headerLogged] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, failures, headerLogged, angle, wingAngle, tol, template, tipPoint, innerPoint, withinFuselageHeight, fuselageLength)
 if isnan(angle) || isnan(wingAngle)
-    logText = logf(logText, 'Unable to verify stealth shaping due to missing geometry data\n');
+    [logText, headerLogged] = logStealth(logText, headerLogged, 'Unable to verify stealth shaping due to missing geometry data\n');
     failures = failures + 1;
 elseif ~(anglesParallel(angle, wingAngle, tol) || (withinFuselageHeight && teNormalHitsCenterline(tipPoint, innerPoint, fuselageLength)))
-    logText = logf(logText, template, angle, wingAngle, tol);
+    [logText, headerLogged] = logStealth(logText, headerLogged, template, angle, wingAngle, tol);
     failures = failures + 1;
 end
 end
@@ -1523,6 +1524,14 @@ tipZ = componentZ + spanOffset * tand(dihedralAngle);
 lower = fuselageCenterZ - fuselageHeight/2;
 upper = fuselageCenterZ + fuselageHeight/2;
 tf = componentZ >= lower && componentZ <= upper && tipZ >= lower && tipZ <= upper;
+end
+
+function [logText, headerLogged] = logStealth(logText, headerLogged, fmt, varargin)
+if ~headerLogged
+    logText = logf(logText, 'Stealth shaping violations:\n');
+    headerLogged = true;
+end
+logText = logf(logText, fmt, varargin{:});
 end
 
 function field = mapCurveField(label)
