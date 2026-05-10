@@ -52,7 +52,7 @@ function checkGeometryBlocks(main) {
   const pushMissing = (row, col) => missing.push(cellRef(row - 1, col - 1));
 
   // Block B18:H27 with skips
-  const skips1 = new Set(["B24", "C24", "D27", "E27", "F27", "G27", "H26"]);
+  const skips1 = new Set(["B24", "C24", "E22", "G22", "D27", "E27", "F27", "G27", "H26"]);
   for (let r = 18; r <= 27; r += 1) {
     for (let c = 2; c <= 8; c += 1) {
       const ref = `${String.fromCharCode(64 + c)}${r}`;

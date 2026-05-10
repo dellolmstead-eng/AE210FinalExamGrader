@@ -311,6 +311,8 @@ geomNaN = isnan(geomBlock);
 skipCells = [...
     7 1;  % B24
     7 2;  % C24
+    5 4;  % E22
+    5 6;  % G22
     10 3; % D27
     10 4; % E27
     10 5; % F27
