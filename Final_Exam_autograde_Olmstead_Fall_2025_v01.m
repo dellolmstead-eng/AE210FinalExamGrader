@@ -311,6 +311,8 @@ geomNaN = isnan(geomBlock);
 skipCells = [...
     7 1;  % B24
     7 2;  % C24
+    5 4;  % E22
+    5 6;  % G22
     10 3; % D27
     10 4; % E27
     10 5; % F27
@@ -721,7 +723,7 @@ end
 
 if pcsActive && ~isnan(pcsDihedral) && pcsDihedral > 5
     [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, pcsLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, pcsTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the surface remains within the fuselage average height (+/- %.1f°).\n', pcsTipTE, pcsInnerTE, isSurfaceWithinFuselageHeight(PCS_z, pcsDihedral, pcsTipTE, pcsInnerTE, fuse_z_center, fuse_z_height));
+    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, pcsTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Pitch control surface trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the surface remains within the fuselage average height (+/- %.1f°).\n', pcsTipTE, pcsInnerTE, isSurfaceWithinFuselageHeight(PCS_z, pcsDihedral, pcsTipTE, pcsInnerTE, fuse_z_center, fuse_z_height), fuselage_length);
 end
 
 if strakeActive
@@ -736,7 +738,7 @@ elseif isnan(vtTilt)
     stealthFailures = stealthFailures + 1;
 elseif vtTilt < 85
     [logText, stealthFailures] = requireParallelAngle(logText, stealthFailures, vtLeadingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail leading edge sweep %.1f° must be parallel to the wing leading edge %.1f° (+/- %.1f°).\n');
-    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isSurfaceWithinFuselageHeight(VT_z, vtTilt, vtTipTE, vtInnerTE, fuse_z_center, fuse_z_height));
+    [logText, stealthFailures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, stealthFailures, vtTrailingAngle, wingLeadingAngle, STEALTH_TOL, 'Vertical tail trailing edge sweep %.1f° must be parallel to the wing leading edge %.1f° or its normal must reach the fuselage centerline when the tail remains within the fuselage average height (+/- %.1f°).\n', vtTipTE, vtInnerTE, isSurfaceWithinFuselageHeight(VT_z, vtTilt, vtTipTE, vtInnerTE, fuse_z_center, fuse_z_height), fuselage_length);
 end
 
 if stealthFailures > 0
@@ -1119,7 +1121,7 @@ if cnb <= 0.002
     logText = logf(logText, 'Cnb must be > 0.002 (P10 = %.6f)\n', cnb);
     stabilityErrors = stabilityErrors + 1;
 end
-if ~(rat >= 0.3 && rat <= 1)
+if ~(abs(rat) >= 0.3 && abs(rat) <= 1)
     logText = logf(logText, 'Cnb/Clb ratio magnitude must be between 0.3 and 1.0 (Q10 = %.3f)\n', rat);
     stabilityErrors = stabilityErrors + 1;
 end
@@ -1590,6 +1592,17 @@ x = pointA(1) + t * (pointB(1) - pointA(1));
 inRange = true;
 end
 
+function username = extractBlackboardUsername(fname)
+% Blackboard export filenames place the username in the token immediately
+% before "_attempt". Keep this tolerant of dots, dashes, and underscores.
+userTok = regexp(fname, '_([^\s]+?)_attempt(?:_|\.|$)', 'tokens', 'once');
+if ~isempty(userTok)
+    username = userTok{1};
+else
+    username = 'UNKNOWN';
+end
+end
+
 function hit = teNormalHitsCenterline(tipPoint, innerPoint, fuselageLength)
 if any(isnan([tipPoint, innerPoint]))
     hit = false;
@@ -1637,11 +1650,11 @@ elseif ~anglesParallel(angle, wingAngle, tol)
 end
 end
 
-function [logText, failures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, failures, angle, wingAngle, tol, template, tipPoint, innerPoint, withinFuselageHeight)
+function [logText, failures] = requireParallelAngleOrCenterlineIfWithinFuselageHeight(logText, failures, angle, wingAngle, tol, template, tipPoint, innerPoint, withinFuselageHeight, fuselageLength)
 if isnan(angle) || isnan(wingAngle)
     logText = logf(logText, 'Unable to verify stealth shaping due to missing geometry data\n');
     failures = failures + 1;
-elseif ~(anglesParallel(angle, wingAngle, tol) || (withinFuselageHeight && teNormalHitsCenterline(tipPoint, innerPoint, fuselage_length)))
+elseif ~(anglesParallel(angle, wingAngle, tol) || (withinFuselageHeight && teNormalHitsCenterline(tipPoint, innerPoint, fuselageLength)))
     logText = logf(logText, template, angle, wingAngle, tol);
     failures = failures + 1;
 end
@@ -1812,13 +1825,7 @@ uicontrol('Parent', d, ...
             for i = 1:numel(files)
                 fname = files(i).name;
 
-                % Extract username from the canonical segment "_<username>_attempt"
-                userTok = regexp(fname, '_([A-Za-z0-9\\.\\-]+)_attempt', 'tokens', 'once');
-                if ~isempty(userTok)
-                    username = userTok{1};
-                else
-                    username = 'UNKNOWN';
-                end
+                username = extractBlackboardUsername(fname);
 
                 % Get score and feedback
                 score = max(0, min(100, roundToTenth(points(i))));

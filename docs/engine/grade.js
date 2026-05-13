@@ -52,7 +52,7 @@ function checkGeometryBlocks(main) {
   const pushMissing = (row, col) => missing.push(cellRef(row - 1, col - 1));
 
   // Block B18:H27 with skips
-  const skips1 = new Set(["B24", "C24", "D27", "E27", "F27", "G27", "H26"]);
+  const skips1 = new Set(["B24", "C24", "E22", "G22", "D27", "E27", "F27", "G27", "H26"]);
   for (let r = 18; r <= 27; r += 1) {
     for (let c = 2; c <= 8; c += 1) {
       const ref = `${String.fromCharCode(64 + c)}${r}`;
@@ -662,7 +662,7 @@ function checkStability(main) {
     fb.push(`Cnb must be > 0.002 (P10 = ${cnb?.toFixed?.(6) ?? "NaN"})`);
     failures += 1;
   }
-  if (!(rat >= 0.3 && rat <= 1)) {
+  if (!(Math.abs(rat) >= 0.3 && Math.abs(rat) <= 1)) {
     fb.push(`Cnb/Clb ratio magnitude must be between 0.3 and 1.0 (Q10 = ${roundToTenth(rat)})`);
     failures += 1;
   }
