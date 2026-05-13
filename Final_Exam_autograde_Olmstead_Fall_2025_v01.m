@@ -30,7 +30,7 @@
 % Outputs:
 % - Text log file: textout_<timestamp>.txt
 % - Histogram of scores
-% - Optional Blackboard CSV: FinalProject_Blackboard_Offline_<timestamp>.csv
+% - Optional Blackboard CSV: FinalExam_Blackboard_Offline_<timestamp>.csv
 %
 % Scoring:
 % - 85 pts for meeting threshold requirements (range 500 nm radius, cost <$120M @187, 8x AIM-120D, constraint table, Tavailable > Drag, control surface attachment, stability, positive volume, landing gear)
@@ -1305,7 +1305,7 @@ firstLine = logLines(1);
 remainingLines = logLines(2:end);
 logText = strjoin([firstLine; splitlines(string(bucketSummary)); remainingLines; splitlines(string(scoreSummary))], newline);
 
-% Command window summary (GE3-style quick view)
+% Command window summary (Draft Aircraft-style quick view)
 bucketLabel = @(pass, reasons) ternary(pass, 'PASS', ...
     ['FAIL (-5)', ternary(isempty(reasons), '', [' [' strjoin(reasons, '; ') ']'])]);
 
