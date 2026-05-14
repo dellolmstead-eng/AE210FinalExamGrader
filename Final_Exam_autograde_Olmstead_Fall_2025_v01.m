@@ -449,6 +449,7 @@ end
 controlFailures = 0;
 VALUE_TOL = 1e-3;
 AR_TOL = 0.1;
+PCS_WING_FRACTION = 0.25;
 VT_WING_FRACTION = 0.8;
 EDGE_ALIGN_TOL = 0.2;
 
@@ -459,12 +460,14 @@ VT_area = Main(18, 8);
 strake_area = Main(18, 4);
 PCS_x = Main(23, 3);
 PCS_root_chord = Geom(8, 3);
+wingTE = geomPlanformPoint(Geom, 41);
+wingTE_x = wingTE(1);
 if PCS_area >= 1
-if any(isnan([fuselage_end, PCS_x, PCS_root_chord]))
+if any(isnan([wingTE_x, PCS_x, PCS_root_chord]))
     logText = logf(logText, 'Unable to verify PCS placement due to missing geometry data\n');
     controlFailures = controlFailures + 1;
-elseif PCS_x > (fuselage_end - 0.25 * PCS_root_chord)
-    logText = logf(logText, 'PCS X-location too far aft. Must overlap at least 25%% of root chord.\n');
+elseif PCS_x > (wingTE_x - PCS_WING_FRACTION * PCS_root_chord)
+    logText = logf(logText, 'PCS X-location too far aft. Must overlap the wing trailing edge by at least 25%% of root chord.\n');
     controlFailures = controlFailures + 1;
 end
 end
@@ -648,14 +651,28 @@ else
 end
 
 engine_length = Main(29, 9);
-if any(isnan([engine_diameter, fuselage_end, inlet_x, compressor_x, engine_length]))
+if any(isnan([engine_diameter, fuselage_end, inlet_x, compressor_x, engine_length, wingTrailingRoot(1), wingTrailingTip(1)]))
     logText = logf(logText, 'Unable to verify engine protrusion due to missing geometry data\n');
     controlFailures = controlFailures + 1;
 else
-    protrusion = inlet_x + compressor_x + engine_length - fuselage_end;
+    engine_aft = inlet_x + compressor_x + engine_length;
+    protrusion = engine_aft - fuselage_end;
     if protrusion > engine_diameter + VALUE_TOL
         logText = logf(logText, 'Engine nacelles protrude %.2f ft past the fuselage end (limit %.2f ft).\n', protrusion, engine_diameter);
         controlFailures = controlFailures + 1;
+    end
+    fuselage_aft_limit = fuselage_end - 2 * engine_diameter;
+    if engine_aft + VALUE_TOL < fuselage_aft_limit
+        logText = logf(logText, 'Engine aft end is %.2f ft ahead of the fuselage aft end; limit is %.2f ft (two engine diameters).\n', fuselage_end - engine_aft, 2 * engine_diameter);
+        controlFailures = controlFailures + 1;
+    end
+    wing_aft = max(wingTrailingRoot(1), wingTrailingTip(1));
+    if wingTrailingRoot(1) > fuselage_end + VALUE_TOL
+        wing_aft_limit = wing_aft - 2 * engine_diameter;
+        if engine_aft + VALUE_TOL < wing_aft_limit
+            logText = logf(logText, 'Engine aft end is %.2f ft ahead of the aft-most wing trailing edge; limit is %.2f ft (two engine diameters).\n', wing_aft - engine_aft, 2 * engine_diameter);
+            controlFailures = controlFailures + 1;
+        end
     end
 end
 
@@ -1233,13 +1250,21 @@ if ~stealthPass,           pt = pt - 5; end
 pt = max(0, pt); % floor at 0
 
 objectiveScore = 0;
-if rangeObjectivePass,   objectiveScore = objectiveScore + 5; end
-if costObjectivePass,    objectiveScore = objectiveScore + 5; end
-if payloadObjectivePass, objectiveScore = objectiveScore + 5; end
+if geometryBucketPass
+    if rangeObjectivePass,   objectiveScore = objectiveScore + 5; end
+    if costObjectivePass,    objectiveScore = objectiveScore + 5; end
+    if payloadObjectivePass, objectiveScore = objectiveScore + 5; end
+else
+    logText = logf(logText, 'Bonus points unavailable because the geometry bucket failed.\n');
+end
 
 thresholdScore = roundToTenth(pt);
 objectiveScore = roundToTenth(objectiveScore);
 pt = roundToTenth(thresholdScore + objectiveScore);
+if ~geometryBucketPass
+    pt = roundToTenth(min(pt, 50));
+    logText = logf(logText, 'Final score capped at 50.0 out of 100 because the geometry bucket failed.\n');
+end
 
 missing = {};
 if ~constraintsBucketPass, missing{end+1} = 'constraints/payload/efficiency/Tavail/sheet validity'; end %#ok<AGROW>

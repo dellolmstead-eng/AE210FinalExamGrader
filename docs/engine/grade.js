@@ -195,6 +195,7 @@ function checkControlAttachment(main, geom) {
   let failures = 0;
   const VALUE_TOL = 1e-3;
   const AR_TOL = 0.1;
+  const PCS_WING_FRACTION = 0.25;
   const VT_WING_FRACTION = 0.8;
   const EDGE_ALIGN_TOL = 0.2;
 
@@ -291,12 +292,13 @@ function checkControlAttachment(main, geom) {
   const strakeArea = getNumber(main, "D18");
   const PCS_x = getNumber(main, "C23");
   const PCS_root = getNumber(geom, "C8");
+  const wingTeX = asNumber(geom?.[40]?.[11]);
   if (Number.isFinite(pcsArea) && pcsArea >= 1) {
-  if (!Number.isFinite(fuselage_end) || !Number.isFinite(PCS_x) || !Number.isFinite(PCS_root)) {
+  if (!Number.isFinite(wingTeX) || !Number.isFinite(PCS_x) || !Number.isFinite(PCS_root)) {
     fb.push("Unable to verify PCS placement due to missing geometry data");
     failures += 1;
-  } else if (PCS_x > fuselage_end - 0.25 * PCS_root) {
-    fb.push("PCS X-location too far aft. Must overlap at least 25% of root chord.");
+  } else if (PCS_x > wingTeX - PCS_WING_FRACTION * PCS_root) {
+    fb.push("PCS X-location too far aft. Must overlap the wing trailing edge by at least 25% of root chord.");
     failures += 1;
   }
   }
@@ -498,13 +500,31 @@ function checkControlAttachment(main, geom) {
   }
 
   const engine_length = getNumber(main, "I29");
-  if (!Number.isFinite(engine_diameter) || !Number.isFinite(fuselage_end) || !Number.isFinite(inlet_x) || !Number.isFinite(compressor_x) || !Number.isFinite(engine_length)) {
+  if (
+    !Number.isFinite(engine_diameter) ||
+    !Number.isFinite(fuselage_end) ||
+    !Number.isFinite(inlet_x) ||
+    !Number.isFinite(compressor_x) ||
+    !Number.isFinite(engine_length) ||
+    !Number.isFinite(wingTrailingRoot[0]) ||
+    !Number.isFinite(wingTrailingTip[0])
+  ) {
     fb.push("Unable to verify engine protrusion due to missing geometry data");
     failures += 1;
   } else {
-    const protrusion = inlet_x + compressor_x + engine_length - fuselage_end;
+    const engineAft = inlet_x + compressor_x + engine_length;
+    const protrusion = engineAft - fuselage_end;
     if (protrusion > engine_diameter + VALUE_TOL) {
       fb.push(`Engine nacelles protrude ${protrusion.toFixed(2)} ft past the fuselage end (limit ${engine_diameter.toFixed(2)} ft).`);
+      failures += 1;
+    }
+    if (engineAft + VALUE_TOL < fuselage_end - 2 * engine_diameter) {
+      fb.push(`Engine aft end is ${(fuselage_end - engineAft).toFixed(2)} ft ahead of the fuselage aft end; limit is ${(2 * engine_diameter).toFixed(2)} ft (two engine diameters).`);
+      failures += 1;
+    }
+    const wingAft = Math.max(wingTrailingRoot[0], wingTrailingTip[0]);
+    if (wingTrailingRoot[0] > fuselage_end + VALUE_TOL && engineAft + VALUE_TOL < wingAft - 2 * engine_diameter) {
+      fb.push(`Engine aft end is ${(wingAft - engineAft).toFixed(2)} ft ahead of the aft-most wing trailing edge; limit is ${(2 * engine_diameter).toFixed(2)} ft (two engine diameters).`);
       failures += 1;
     }
   }
@@ -868,13 +888,21 @@ export function gradeWorkbook(workbook) {
   pt = Math.max(0, pt);
 
   let objectiveScore = 0;
-  if (mission.rangeObjectivePass) objectiveScore += 5;
-  if (costResult.costObjectivePass) objectiveScore += 5;
-  if (payload.payloadObjectivePass) objectiveScore += 5;
+  if (geometryBucketPass) {
+    if (mission.rangeObjectivePass) objectiveScore += 5;
+    if (costResult.costObjectivePass) objectiveScore += 5;
+    if (payload.payloadObjectivePass) objectiveScore += 5;
+  } else {
+    feedback.push("Bonus points unavailable because the geometry bucket failed.");
+  }
 
   const thresholdScore = roundToTenth(pt);
   objectiveScore = roundToTenth(objectiveScore);
   pt = roundToTenth(thresholdScore + objectiveScore);
+  if (!geometryBucketPass) {
+    pt = roundToTenth(Math.min(pt, 50));
+    feedback.push("Final score capped at 50.0 out of 100 because the geometry bucket failed.");
+  }
 
   const missing = [];
   if (!constraintsBucketPass) missing.push("constraints/payload/efficiency/Tavail/sheet validity");
